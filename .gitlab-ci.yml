@@ -1,0 +1,84 @@
+# This file is a template, and might need editing before it works on your project.
+#Template gitlab-ci angular SPV
+
+variables:
+  APP_NAME: PruebasCDCI
+  REPO_NAME: PruebasCDCI
+  BUILD_GROUP: snapshot
+  RESOURCE_PATH: .
+  GROUP_ID: 
+  REPO_MVN: ${REPO_NAME}-maven-local
+  REPO_GENERIC: ${REPO_NAME}-generic-local
+  REPO_DOCKER:  
+  REPO_SPV: 
+  DOCKERFILE: .
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: tcp://localhost:2375
+  DOCKER_TLS_CERTDIR: ''
+  SONAR_HOST_URL: 
+
+before_script:
+  - export BUILD_VERSION=$(cat package.json | grep \"version\" | cut -d "\"" -f4)
+
+stages:
+  - Build
+  - Package
+  - Deploy
+  - Release
+
+# Code Quality Angular:
+#   image: docker-spv.artifactory.gscorp.ad/sonarscanner-nodejs-spv:1.0.2
+#   stage: CodeQuality
+#   script:
+#    - npm config set registry http://registry.npmjs.org/
+#    - npm install --force
+#    - npm run-script build
+#    - npm run-script coverage --if-present
+#    - sonar-scanner -Dsonar.projectKey=${APP_NAME_SONAR} -Dsonar.qualitygate.wait=${QUALITY_GATE_SONAR} -Dsonar.sources=. -Dsonar.host.url=${SONAR_HOST_URL} -Dsonar.login=${SONAR_TOKEN}
+#   rules:
+#   - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+#     when: never
+#   - if: '$LANG == "angular" && $CI_COMMIT_REF_NAME == "develop" || $LANG == "angular" && $CI_COMMIT_REF_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"'
+#     when: always
+#     allow_failure: false
+#   - if: '$LANG == "angular" && $CI_COMMIT_REF_NAME != "develop" && $CI_COMMIT_REF_NAME != "master" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "master"'
+#     when: always
+#     allow_failure: true
+
+Build Angular:
+  image:  
+  stage: Build
+  script:
+    - npm install --force
+    - npm run-script build
+#   - npm run-script test -- --no-watch --no-progress
+  artifacts:
+    paths:
+      - dist/*
+    expire_in: 1 day
+    reports:
+      junit: dist/test-results/test/TEST-*.xml
+#  needs:
+#    - job: "Code Quality Angular"
+  rules:
+    - if: '$LANG == "angular"'
+
+
+
+include:
+  - project: "gitlab-ci-templates/kubernetes"
+    ref: "new-sonar-test"
+    file: ".build.yml"
+  - project: "gitlab-ci-templates/kubernetes"
+    ref: "master"
+    file: ".package.yml"
+  - project: "gitlab-ci-templates/kubernetes"
+    ref: "master"
+    file: ".deploy.yml"
+  # - project: "gitlab-ci-templates/kubernetes"
+  #   ref: "new-sonar-test"
+  #   file: ".codequalityv2.yml"
+  - project: "gitlab-ci-templates/kubernetes"
+    ref: "master"
+    file: ".release.yml"
+
